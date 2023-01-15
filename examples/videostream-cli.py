@@ -14,7 +14,76 @@ from aiortc import (
     VideoStreamTrack,
 )
 from aiortc.contrib.media import MediaBlackhole, MediaPlayer, MediaRecorder
-from aiortc.contrib.signaling import BYE, add_signaling_arguments, create_signaling
+
+# https://github.com/aiortc/aiortc/blob/main/src/aiortc/contrib/signaling.py
+import sys
+import json
+from aiortc import RTCIceCandidate, RTCSessionDescription
+from aiortc.sdp import candidate_from_sdp, candidate_to_sdp
+
+logger = logging.getLogger(__name__)
+BYE = object()
+
+
+def object_from_string(message_str):
+    message = json.loads(message_str)
+    if message["type"] in ["answer", "offer"]:
+        return RTCSessionDescription(**message)
+    elif message["type"] == "candidate" and message["candidate"]:
+        candidate = candidate_from_sdp(message["candidate"].split(":", 1)[1])
+        candidate.sdpMid = message["id"]
+        candidate.sdpMLineIndex = message["label"]
+        return candidate
+    elif message["type"] == "bye":
+        return BYE
+
+
+def object_to_string(obj):
+    if isinstance(obj, RTCSessionDescription):
+        message = {"sdp": obj.sdp, "type": obj.type}
+    elif isinstance(obj, RTCIceCandidate):
+        message = {
+            "candidate": "candidate:" + candidate_to_sdp(obj),
+            "id": obj.sdpMid,
+            "label": obj.sdpMLineIndex,
+            "type": "candidate",
+        }
+    else:
+        assert obj is BYE
+        message = {"type": "bye"}
+    return json.dumps(message, sort_keys=True)
+
+class MatrixSignaling:
+    def __init__(self):
+        self._read_pipe = sys.stdin
+        self._read_transport = None
+        self._reader = None
+        self._write_pipe = sys.stdout
+
+    async def connect(self):
+        loop = asyncio.get_event_loop()
+        self._reader = asyncio.StreamReader(loop=loop)
+        self._read_transport, _ = await loop.connect_read_pipe(
+            lambda: asyncio.StreamReaderProtocol(self._reader), self._read_pipe
+        )
+
+    async def close(self):
+        if self._reader is not None:
+            await self.send(BYE)
+            self._read_transport.close()
+            self._reader = None
+
+    async def receive(self):
+        print("-- Please enter a message from remote party --")
+        data = await self._reader.readline()
+        print()
+        return object_from_string(data.decode(self._read_pipe.encoding))
+
+    async def send(self, descr):
+        print("-- Please send this message to the remote party --")
+        self._write_pipe.write(object_to_string(descr) + "\n")
+        self._write_pipe.flush()
+        print()
 
 
 class FlagVideoStreamTrack(VideoStreamTrack):
@@ -127,14 +196,13 @@ if __name__ == "__main__":
     parser.add_argument("--play-from", help="Read the media from a file and sent it."),
     parser.add_argument("--record-to", help="Write received media to a file."),
     parser.add_argument("--verbose", "-v", action="count")
-    add_signaling_arguments(parser)
     args = parser.parse_args()
 
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
 
     # create signaling and peer connection
-    signaling = create_signaling(args)
+    signaling = MatrixSignaling()
     pc = RTCPeerConnection()
 
     # create media source
