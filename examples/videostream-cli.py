@@ -138,6 +138,7 @@ class FlagVideoStreamTrack(VideoStreamTrack):
         frame.pts = pts
         frame.time_base = time_base
         self.counter += 1
+        print(f"# recv(): {self.counter}")
         return frame
 
     def _create_rectangle(self, width, height, color):
@@ -189,6 +190,29 @@ async def run(pc, player, recorder, signaling, role):
             print("Exiting")
             break
 
+async def matrix_client_run():
+    # By setting `store_sync_tokens` to true, we'll save sync tokens to our
+    # store every time we sync, thereby preventing reading old, previously read
+    # events on each new sync.
+    # For more info, check out https://matrix-nio.readthedocs.io/en/latest/nio.html#asyncclient
+
+
+    from manual_encrypted_verify import ClientConfig, CustomEncryptedClient, ALICE_HOMESERVER, ALICE_USER_ID, STORE_FOLDER
+    config = ClientConfig(store_sync_tokens=True)
+    client = CustomEncryptedClient(
+        ALICE_HOMESERVER,
+        ALICE_USER_ID,
+        store_path=STORE_FOLDER,
+        config=config,
+        #ssl=False,
+        #proxy="http://localhost:8080",
+    )
+
+    try:
+        await client.run()
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        await client.close()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Video stream from the command line")
@@ -220,6 +244,8 @@ if __name__ == "__main__":
     # run event loop
     loop = asyncio.get_event_loop()
     try:
+        loop.create_task(matrix_client_run())
+
         loop.run_until_complete(
             run(
                 pc=pc,

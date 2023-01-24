@@ -15,3 +15,6 @@ doc/html
 *.swp
 build
 .idea/
+examples/nio_store
+examples/credentials.json
+manual_encrypted_verify.env

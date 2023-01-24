@@ -46,22 +46,27 @@ SESSION_DETAILS_FILE = "credentials.json"
 # them "trusted". If an unknown device shows up (like @bob signs into their
 # account on another device), this program will refuse to send a message in the
 # room. Try it!
-BOB_ID = "@bob:example.org"
+#BOB_ID = "@bob:example.org"
+BOB_ID = os.environ['BOB_ID']
 BOB_DEVICE_IDS = [
     # You can find these in Riot under Settings > Security & Privacy.
     # They may also be called "session IDs". You'll want to add ALL of them here
     # for the one other user in your encrypted room
-    "URDEVICEID",
+#    "URDEVICEID",
+    os.environ['BOB_DEVICE_ID']
 ]
 
 # the ID of the room you want your bot to join and send commands in.
 # This can be a direct message or room; Matrix treats them the same
-ROOM_ID = "!myfavouriteroom:example.org"
+#ROOM_ID = "!myfavouriteroom:example.org"
+ROOM_ID = os.environ['ROOM_ID']
 
-ALICE_USER_ID = "@alice:example.org"
-ALICE_HOMESERVER = "https://matrix.example.org"
-ALICE_PASSWORD = "hunter2"
-
+#ALICE_USER_ID = "@alice:example.org"
+#ALICE_HOMESERVER = "https://matrix.example.org"
+#ALICE_PASSWORD = "hunter2"
+ALICE_USER_ID = os.environ['ALICE_USER_ID']
+ALICE_HOMESERVER = os.environ['ALICE_HOMESERVER']
+ALICE_PASSWORD = os.environ['ALICE_PASSWORD']
 
 class CustomEncryptedClient(AsyncClient):
     def __init__(
@@ -248,59 +253,59 @@ class CustomEncryptedClient(AsyncClient):
             )
 
 
-async def run_client(client: CustomEncryptedClient) -> None:
-    """A basic encrypted chat application using nio."""
+    async def run(self) -> None:
+        """A basic encrypted chat application using nio."""
 
-    # This is our own custom login function that looks for a pre-existing config
-    # file and, if it exists, logs in using those details. Otherwise it will log
-    # in using a password.
-    await client.login()
+        # This is our own custom login function that looks for a pre-existing config
+        # file and, if it exists, logs in using those details. Otherwise it will log
+        # in using a password.
+        await self.login()
 
-    # Here we create a coroutine that we can call in asyncio.gather later,
-    # along with sync_forever and any other API-related coroutines you'd like
-    # to do.
-    async def after_first_sync():
-        # We'll wait for the first firing of 'synced' before trusting devices.
-        # client.synced is an asyncio event that fires any time nio syncs. This
-        # code doesn't run in a loop, so it only fires once
-        print("Awaiting sync")
-        await client.synced.wait()
+        # Here we create a coroutine that we can call in asyncio.gather later,
+        # along with sync_forever and any other API-related coroutines you'd like
+        # to do.
+        async def after_first_sync():
+            # We'll wait for the first firing of 'synced' before trusting devices.
+            # self.synced is an asyncio event that fires any time nio syncs. This
+            # code doesn't run in a loop, so it only fires once
+            print("Awaiting sync")
+            await self.synced.wait()
 
-        # In practice, you want to have a list of previously-known device IDs
-        # for each user you want to trust. Here, we require that list as a
-        # global variable
-        client.trust_devices(BOB_ID, BOB_DEVICE_IDS)
+            # In practice, you want to have a list of previously-known device IDs
+            # for each user you want to trust. Here, we require that list as a
+            # global variable
+            self.trust_devices(BOB_ID, BOB_DEVICE_IDS)
 
-        # In this case, we'll trust _all_ of @alice's devices. NOTE that this
-        # is a SUPER BAD IDEA in practice, but for the purpose of this example
-        # it'll be easier, since you may end up creating lots of sessions for
-        # @alice as you play with the script
-        client.trust_devices(ALICE_USER_ID)
+            # In this case, we'll trust _all_ of @alice's devices. NOTE that this
+            # is a SUPER BAD IDEA in practice, but for the purpose of this example
+            # it'll be easier, since you may end up creating lots of sessions for
+            # @alice as you play with the script
+            self.trust_devices(ALICE_USER_ID)
 
-        await client.send_hello_world()
+            await self.send_hello_world()
 
-    # We're creating Tasks here so that you could potentially write other
-    # Python coroutines to do other work, like checking an API or using another
-    # library. All of these Tasks will be run concurrently.
-    # For more details, check out https://docs.python.org/3/library/asyncio-task.html
+        # We're creating Tasks here so that you could potentially write other
+        # Python coroutines to do other work, like checking an API or using another
+        # library. All of these Tasks will be run concurrently.
+        # For more details, check out https://docs.python.org/3/library/asyncio-task.html
 
-    # ensure_future() is for Python 3.5 and 3.6 compatibility. For 3.7+, use
-    # asyncio.create_task()
-    after_first_sync_task = asyncio.ensure_future(after_first_sync())
+        # ensure_future() is for Python 3.5 and 3.6 compatibility. For 3.7+, use
+        # asyncio.create_task()
+        after_first_sync_task = asyncio.ensure_future(after_first_sync())
 
-    # We use full_state=True here to pull any room invites that occurred or
-    # messages sent in rooms _before_ this program connected to the
-    # Matrix server
-    sync_forever_task = asyncio.ensure_future(
-        client.sync_forever(30000, full_state=True)
-    )
+        # We use full_state=True here to pull any room invites that occurred or
+        # messages sent in rooms _before_ this program connected to the
+        # Matrix server
+        sync_forever_task = asyncio.ensure_future(
+            self.sync_forever(30000, full_state=True)
+        )
 
-    await asyncio.gather(
-        # The order here IS significant! You have to register the task to trust
-        # devices FIRST since it awaits the first sync
-        after_first_sync_task,
-        sync_forever_task,
-    )
+        await asyncio.gather(
+            # The order here IS significant! You have to register the task to trust
+            # devices FIRST since it awaits the first sync
+            after_first_sync_task,
+            sync_forever_task,
+        )
 
 
 async def main():
@@ -319,7 +324,7 @@ async def main():
     )
 
     try:
-        await run_client(client)
+        await client.run()
     except (asyncio.CancelledError, KeyboardInterrupt):
         await client.close()
 
