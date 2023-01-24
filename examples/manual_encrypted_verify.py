@@ -4,6 +4,8 @@ import os
 import sys
 from typing import Optional
 
+from rtcbot import RTCBot
+
 from nio import (
     AsyncClient,
     ClientConfig,
@@ -16,6 +18,8 @@ from nio import (
     MatrixUser,
     RoomMessageText,
     RoomSendResponse,
+    CallInviteEvent,
+    CallCandidatesEvent,
     crypto,
     exceptions,
 )
@@ -101,6 +105,11 @@ class CustomEncryptedClient(AsyncClient):
 
         # print all the messages we receive
         self.add_event_callback(self.cb_print_messages, RoomMessageText)
+
+        # handle calls
+        self.rtcbot = RTCBot(self)
+        self.add_event_callback(self.rtcbot.cb_call_invite, CallInviteEvent)
+        self.add_event_callback(self.rtcbot.cb_call_candidates, CallCandidatesEvent)
 
     async def login(self) -> None:
         """Log in either using the global variables or (if possible) using the
@@ -320,7 +329,7 @@ async def main():
         store_path=STORE_FOLDER,
         config=config,
         ssl=False,
-        proxy="http://localhost:8080",
+        #proxy="http://localhost:8080",
     )
 
     try:
