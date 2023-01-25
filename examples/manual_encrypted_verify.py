@@ -108,8 +108,6 @@ class CustomEncryptedClient(AsyncClient):
 
         # handle calls
         self.rtcbot = RTCBot(self)
-        self.add_event_callback(self.rtcbot.cb_call_invite, CallInviteEvent)
-        self.add_event_callback(self.rtcbot.cb_call_candidates, CallCandidatesEvent)
 
     async def login(self) -> None:
         """Log in either using the global variables or (if possible) using the

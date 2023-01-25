@@ -49,6 +49,9 @@ class RTCBot:
             print("Receiving %s" % track.kind)
             self.recorder.addTrack(track)
 
+        self.nio_client.add_event_callback(self.cb_call_invite, CallInviteEvent)
+        #self.nio_client.add_event_callback(self.cb_call_candidates, CallCandidatesEvent)
+
     def add_tracks(self):
         self.pc.addTrack(FlagVideoStreamTrack())
 
@@ -84,6 +87,8 @@ class RTCBot:
         print(f"=== ANSWER ===\n{json.dumps(answer_content)}\n\n")
 
         try:
+            import pdb
+            pdb.set_trace()
             await self.nio_client.room_send(
                 room_id=ROOM_ID,
                 message_type="m.call.answer",
